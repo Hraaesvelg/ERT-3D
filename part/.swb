@@ -1,0 +1,1176 @@
+dim swApp
+dim storePath
+dim docVisible
+dim errorsDoc as long
+dim warningsDoc as long
+Private Const MAX_PATH = 260
+'Directories only
+Private Const BIF_RETURNONLYFSDIRS = &H1&
+'Windows 2000 (Shell32.dll 5.0) extended dialog
+Private Const BIF_NEWDIALOGSTYLE = &H40
+' show edit box
+Private Const BIF_EDITBOX = &H10&
+' add all dir options
+Private Const BIF_BrowseFolder = BIF_EDITBOX  Or BIF_RETURNONLYFSDIRS Or BIF_NEWDIALOGSTYLE
+' set the virtual desktop as  ini folder 
+Private Const IniFolder = &H0 'Virtual Desktop
+Function getLastFeatureByType(model,typ)  
+  Set feat = model.FirstFeature ' Get the 1st feature in part
+  Set res = Nothing
+  Count = 0
+  Do While Not feat Is Nothing ' While we have a valid feature
+    If feat.GetTypeName() = typ Then
+      Set res = feat
+    End If
+    Set feat = feat.GetNextFeature() ' Get the next feature
+  Loop ' Continue until no more
+  Set getLastFeatureByType = res
+End Function
+' this code with copy a matrix to a other
+Function copyMat4x4(source)
+Dim res(0 To 15) As Double
+For i = 0 To 15
+ res(i) = source(i)
+Next
+copyMat4x4 = res
+End Function
+
+' This code creates a mat from a sw mat
+Function createMatFromSWMat(source)
+ Dim res(0 To 15) As Double
+ res(0) = source(0)
+ res(1) = source(1)
+ res(2) = source(2)
+ res(3) = 0
+ res(4) = source(3)
+ res(5) = source(4)
+ res(6) = source(5)
+ res(7) = 0
+ res(8) = source(6)
+ res(9) = source(7)
+ res(10) = source(8)
+ res(11) = 0
+ res(12) = source(9)
+ res(13) = source(10)
+ res(14) = source(11)
+ res(15) = source(12)
+ createMatFromSWMat = res
+End Function
+Function createSWMatFromMat(source)
+ Dim res(0 To 15) As Double
+ res(0) = source(0)
+ res(1) = source(1)
+ res(2) = source(2)
+ res(3) = source(4)
+ res(4) = source(5)
+ res(5) = source(6)
+ res(6) = source(8)
+ res(7) = source(9)
+ res(8) = source(10)
+ res(9) = source(12)
+ res(10) = source(13)
+ res(11) = source(14)
+ res(12) = source(15)
+ res(13) = 0
+ res(14) = 0
+ res(15) = 0
+ createSWMatFromMat = res
+End Function
+Function createMat4x4FromValues(x1,x2,x3,y1,y2,y3,z1,z2,z3,t1,t2,t3)
+ Dim res(0 To 15) As Double
+ res(0) = x1
+ res(1) = x2
+ res(2) = x3
+ res(3) = 0
+ res(4) = y1
+ res(5) = y2
+ res(6) = y3
+ res(7) = 0
+ res(8) = z1
+ res(9) = z2
+ res(10) =z3
+ res(11) = 0
+ res(12) = t1
+ res(13) = t2
+ res(14) = t3
+ res(15) = 1
+ createMat4x4FromValues = res
+End Function
+' this code will mult a common mat with any other stuff
+Function multMatMat(ld, xld, yld, rd, xrd, yrd)
+  mulRes = yld * xrd
+  'Dim od(0 To 0) As Variant
+  ReDim od(mulRes - 1) As Double
+  For i = 0 To mulRes - 1
+   od(i) = 0#
+  Next
+  y = 0
+  While y < yld
+    x = 0
+    While x < xrd
+      i = 0
+      While i < xld
+       od(x * yld + y) = od(x * yld + y) + ld(i * yld + y) * rd(x * yrd + i)
+       i = i + 1
+      Wend
+      x = x + 1
+    Wend
+    y = y + 1
+  Wend
+  multMatMat = od
+
+End Function
+' this code will mult a vector with a matrix
+Function mulMat4x4Values3d(mat, x,y,z)
+  tmp = createVec4d(x, y, z, 1)
+  res = multMatMat(mat, 4, 4, tmp, 1, 3)
+  mulMat4x4Values3d = createVec3d(res(0), res(1), res(2))
+End Function
+Function mulMat4x4Vec3d(mat, vec)
+  tmp = createVec4d(vec(0), vec(1), vec(2), 1)
+  res = multMatMat(mat, 4, 4, tmp, 1, 3)
+  mulMat4x4Vec3d = createVec3d(res(0), res(1), res(2))
+End Function
+Function mulMat4x4Mat4x4(mat1, mat2)
+  mulMat4x4Mat4x4 = multMatMat(mat1, 4, 4, mat2, 4, 4)
+End Function
+' create a 4x4 matrix
+Function createMat4x4()
+ Dim res(0 To 15) As Double
+ for i = 0 to 15 
+ res(i) = 0
+ next
+ createMat4x4 = res
+End Function
+Function createMat4x4Ident()
+ Dim res(0 To 15) As Double
+ res(0) = 1
+ res(5) = 1
+ res(10) = 1
+ res(15) = 1
+ res(1) = 0
+ res(2) = 0
+ res(3) = 0
+ res(4) = 0
+ res(6) = 0
+ res(7) = 0
+ res(8) = 0
+ res(9) = 0
+ res(11) = 0
+ res(12) = 0
+ res(13) = 0
+ res(14) = 0
+ createMat4x4Ident = res
+End Function
+' this function create a new vector
+Function createVec3d(x, y, z)
+ Dim res(0 To 2) As Double
+ res(0) = x
+ res(1) = y
+ res(2) = z
+ createVec3d = res
+End Function
+' this function create a new vector
+Function createVec4d(x, y, z, w)
+ Dim res(0 To 3) As Double
+ res(0) = x
+ res(1) = y
+ res(2) = z
+ res(3) = w
+ createVec4d = res
+End Function
+
+Function getMatTVec(mat)
+ getMatTVec = createVec3d(mat(12), mat(13), mat(14))
+End Function
+
+Sub setMatTVec(mat, v)
+ mat(12) = v(0)
+ mat(13) = v(1)
+ mat(14) = v(2)
+End Sub
+Sub setMatXVec(mat, v)
+ mat(0) = v(0)
+ mat(1) = v(1)
+ mat(2) = v(2)
+End Sub
+Sub setMatYVec(mat, v)
+ mat(4) = v(0)
+ mat(5) = v(1)
+ mat(6) = v(2)
+End Sub
+Sub setMatZVec(mat, v)
+ mat(8) = v(0)
+ mat(9) = v(1)
+ mat(10) = v(2)
+End Sub
+Sub setMatScale(mat, s)
+ mat(15) = s
+End Sub
+Function getMatXVec(mat)
+ getMatXVec = createVec3d(mat(0), mat(1), mat(2))
+End Function
+Function getMatYVec(mat)
+ getMatYVec = createVec3d(mat(4), mat(5), mat(6))
+End Function
+Function getMatZVec(mat)
+ getMatZVec = createVec3d(mat(8), mat(9), mat(10))
+End Function
+
+Function negVec3d(v)
+ negVec3d = createVec3d(-v(0), -v(1), -v(2))
+End Function
+Function scaleVec3d(v,s)
+ scaleVec3d = createVec3d(v(0)*s,v(1)*s,v(2)*s)
+End Function
+' invert a 4x4 matrix
+Function invMat4x4(source)
+target = copyMat4x4(source)
+setMatTVec target, createVec3d(0, 0, 0)
+ target(1) = source(4)
+ target(4) = source(1)
+ target(2) = source(8)
+ target(8) = source(2)
+ target(6) = source(9)
+ target(9) = source(6)
+ setMatScale target,1
+ t = getMatTVec(source)
+ v = mulMat4x4Vec3d(target, t)
+ setMatTVec target, negVec3d(v)
+ invMat4x4 = target
+End Function
+Function IsEqual(argVec3DA, argVec3DB)
+  For i = 0 To 2
+    If( argVec3DA(i) <> argVec3DB(i) ) Then
+      Exit For
+    End If
+  Next
+  If(i = 3) Then
+    IsEqual = 1
+  Else
+    IsEqual = 0
+  End If
+End Function
+Function getFaceFromModel(part, pos, normal)
+ Dim partBodies As Variant
+ partBodies = part.GetBodies(swSolidBody)
+ For k = LBound(partBodies) To UBound(partBodies)
+   found = 0
+   Dim body As Object
+   Set body = partBodies(k)
+   Set face = body.GetFirstFace()
+   Set getFaceFromModel = nothing
+   minDist = -1
+   Do While Not face Is Nothing ' While we have a valid feature
+     Set sur = face.GetSurface()
+     If sur.IsPlane() Then
+       planePara = sur.PlaneParams
+       faceNormal = face.normal
+       nTest = faceNormal(0) * normal(0) + faceNormal(1) * normal(1) + faceNormal(2) * normal(2)
+       If nTest > 1 - 0.000001 Then
+         ' check projection
+         closeRes = face.GetClosestPointOn(pos(0), pos(1), pos(2))
+         dTest = (pos(0) - closeRes(0)) * (pos(0) - closeRes(0)) + (pos(1) - closeRes(1)) * (pos(1) - closeRes(1)) + (pos(2) - closeRes(2)) * (pos(2) - closeRes(2))
+         If ( dTest < minDist Or minDist = -1 ) Then
+           Set getFaceFromModel = face
+           minDist = dTest
+           found=1
+         End If
+       End If
+     else
+       If sur.IsCylinder() then
+         closeRes = face.GetClosestPointOn(pos(0), pos(1), pos(2))
+         dTest = (pos(0) - closeRes(0)) * (pos(0) - closeRes(0)) + (pos(1) - closeRes(1)) * (pos(1) - closeRes(1)) + (pos(2) - closeRes(2)) * (pos(2) - closeRes(2))
+         If ( dTest < minDist Or minDist = -1 ) Then
+           res=sur.EvaluateAtPoint(closeRes(0),closeRes(1),closeRes(2))
+           nTest=res(0)*normal(0)+res(1)*normal(1)+res(2)*normal(2)
+           if nTest>1-0.00000001 then
+             Set getFaceFromModel = face
+             found=1
+           End if
+         End if
+       End if
+     End if
+     Set face = face.GetNextFace ' Get the next Face
+   Loop
+   If (found = 1) Then
+     Exit For
+   End If
+ Next k
+End Function
+Function getEdgeFromModel(part, pos,byref edgeRet)
+ Dim partBodies As Variant
+ partBodies = part.GetBodies(swSolidBody)
+ For k = LBound(partBodies) To UBound(partBodies)
+   Dim body As Object
+   Set body = partBodies(k)
+   edges= body.GetEdges()
+   start= LBound(edges)
+   ende = UBound(edges)
+   For i = start To ende
+     Set edge = edges(i)
+     closeRes=edge.GetClosestPointOn(pos(0),pos(1),pos(2))
+     dTest = (pos(0) - closeRes(0)) * (pos(0) - closeRes(0)) + (pos(1) - closeRes(1)) * (pos(1) - closeRes(1)) + (pos(2) - closeRes(2)) * (pos(2) - closeRes(2))
+     If dTest < 0.00000001 Then
+       set edgeRet=edge
+       getEdgeFromModel=true
+       exit function
+     End If
+   Next i
+ Next k
+ getEdgeFromModel=false
+End Function
+sub cLn(part,wMat,x1,y1,x2,y2)
+pk1=mulMat4x4Values3d(wMat,x1,y1,0)
+pk2=mulMat4x4Values3d(wMat,x2,y2,0)
+Part.SketchManager.CreateLine pk1(0),pk1(1),0,pk2(0),pk2(1),0
+end sub
+sub cCLn(part,wMat,x1,y1,x2,y2)
+pk1=mulMat4x4Values3d(wMat,x1,y1,0)
+pk2=mulMat4x4Values3d(wMat,x2,y2,0)
+Part.CreateCenterLineVB pk1(0),pk1(1),0,pk2(0),pk2(1),0
+end sub
+sub cArc(part,wMat,x1,y1,x2,y2,x3,y3)
+pk1=mulMat4x4Values3d(wMat,x1,y1,0)
+pk2=mulMat4x4Values3d(wMat,x2,y2,0)
+pk3=mulMat4x4Values3d(wMat,x3,y3,0)
+Part.SketchManager.Create3PointArc pk1(0),pk1(1),0,pk3(0),pk3(1),0,pk2(0),pk2(1),0
+end sub
+sub cCir(part,wMat,x1,y1,rad)
+pk1=mulMat4x4Values3d(wMat,x1,y1,0)
+Part.SketchManager.CreateCircleByRadius pk1(0),pk1(1),0,rad
+end sub
+sub cEllipse(part,wMat,x1,y1,x2,y2,x3,y3)
+pk1=mulMat4x4Values3d(wMat,x1,y1,0)
+pk2=mulMat4x4Values3d(wMat,x2,y2,0)
+pk3=mulMat4x4Values3d(wMat,x3,y3,0)
+Part.SketchManager.CreateEllipse pk1(0),pk1(1),0,pk2(0),pk2(1),0,pk3(0),pk3(1),0
+end sub
+sub cEllipseArc(part,wMat,x1,y1,x2,y2,x3,y3,x4,y4,x5,y5)
+pk1=mulMat4x4Values3d(wMat,x1,y1,0)
+pk2=mulMat4x4Values3d(wMat,x2,y2,0)
+pk3=mulMat4x4Values3d(wMat,x3,y3,0)
+pk4=mulMat4x4Values3d(wMat,x4,y4,0)
+pk5=mulMat4x4Values3d(wMat,x5,y5,0)
+Part.SketchManager.CreateEllipticalArc  pk1(0),pk1(1),0,pk2(0),pk2(1),0,pk3(0),pk3(1),0,pk4(0),pk4(1),0,pk5(0),pk5(1),0,1
+end sub
+Public Function  BrowseForFolder
+Dim objFolder, objShell
+Set objShell = CreateObject("Shell.Application")
+Set objFolder = objShell.BrowseForFolder(0, "Please select the folder..", BIF_BrowseFolder, IniFolder)
+If Not (objFolder Is Nothing) Then
+		BrowseForFolder = objFolder.Self.path
+End If
+End Function
+Sub SelectCommonEdge(argFaceA, argFaceB)
+  edgesA = argFaceA.GetEdges
+  edgesB = argFaceB.GetEdges
+  For Each edgeA In edgesA
+    Set vertexA1 = edgeA.GetStartVertex
+    Set vertexA2 = edgeA.GetEndVertex
+    pointA1 = vertexA1.GetPoint
+    pointA2 = vertexA2.GetPoint
+    For Each edgeB In edgesB
+      Set vertexB1 = edgeB.GetStartVertex
+      Set vertexB2 = edgeB.GetEndVertex
+      pointB1 = vertexB1.GetPoint
+      pointB2 = vertexB2.GetPoint
+      If ( (IsEqual(pointA1, pointB1) And IsEqual(pointA2, pointB2)) Or (IsEqual(pointA1, pointB2) And IsEqual(pointA2, pointB1)) ) Then
+        edgeA.Select(True)
+        Exit Sub
+      End If
+    Next
+  Next
+End Sub
+Sub CreatePart0
+dim errors as long
+dim warnings as long
+if (docVisible=0) then
+ swApp.DocumentVisible 0, 1
+end if
+set res=swApp.OpenDoc6 ( storePath & "GEAB1_5-20-15-B-12_b.sldprt",1,3,"", errors, warnings)
+if not res is nothing then
+ if (docVisible=0) then
+  swApp.DocumentVisible 1, 1
+ end if
+ exit sub
+end if
+if (docVisible=0) then
+ swApp.DocumentVisible 1, 1
+end if
+Dim longstatus As Long
+Dim sPartTemplateName As String
+sPartTemplateName = swApp.GetUserPreferenceStringValue(8)
+Set part = swApp.NewDocument(sPartTemplateName, 0, 0, 0)
+swApp.ActivateDoc2 "GEAB1_5-20-15-B-12_b.sldprt", False, longstatus
+Set part = swApp.ActiveDoc
+part.SketchManager.AddToDB = true
+part.SketchManager.DisplayWhenAdded = false
+part.ActiveView.EnableGraphicsUpdate = false
+Set modelExt = part.Extension
+Set customPropMgr = modelExt.CustomPropertyManager("")
+customPropMgr.Add2 "NB", 30, "GEAB1.5-20-15-B-12_b"
+customPropMgr.Add2 "NN", 30, "GEAHB1.5, GEAHBB1.5, GEAHBG1.5, GEAHS1.5, GEAB1.5, GEABB1.5, GEABG1.5, GEAS1.5, GEAKB1.5, GEAKBB1.5, GEAKBG1.5, GEAKS1.5_body"
+customPropMgr.Add2 "NT", 30, "Spur Gears - Pressure Angle 20 degree Module 1.5"
+customPropMgr.Add2 "NBSYN", 30, "$PN._b"
+customPropMgr.Add2 "LINA", 30, "GEAB1.5-20-15-B-12"
+customPropMgr.Add2 "CATALOG", 30, "Misumi"
+customPropMgr.Add2 "PN", 30, "GEAB1.5-20-15-B-12"
+customPropMgr.Add2 "SHS", 30, "Round Hole+Tap"
+customPropMgr.Add2 "MAT", 30, "S45C Equivalent"
+customPropMgr.Add2 "ST", 30, "-"
+customPropMgr.Add2 "MOD", 30, "1.5"
+customPropMgr.Add2 "NT", 30, "20"
+customPropMgr.Add2 "B", 30, "15"
+customPropMgr.Add2 "TS", 30, "B"
+customPropMgr.Add2 "PS", 30, "12"
+customPropMgr.Add2 "DD", 30, "30.0"
+customPropMgr.Add2 "D", 30, "33.0"
+customPropMgr.Add2 "G", 30, "26.25"
+customPropMgr.Add2 "H", 30, "25.0"
+customPropMgr.Add2 "L", 30, "27"
+customPropMgr.Add2 "LL1", 30, "12"
+customPropMgr.Add2 "LL2", 30, "5"
+customPropMgr.Add2 "M", 30, "M4"
+customPropMgr.Add2 "BB", 30, "4"
+customPropMgr.Add2 "TT", 30, "0.0"
+customPropMgr.Add2 "ALT1", 30, "w/o Set Screw"
+customPropMgr.Add2 "ALT2", 30, "w/o TPC (Tapped Hole Dimension)"
+customPropMgr.Add2 "TPC", 30, "N/A"
+customPropMgr.Add2 "ALT11", 30, "w/o GBA (Gear bottom adjustment of phase focus)"
+customPropMgr.Add2 "ALT10", 30, "w/o BS (Boss Cut)"
+customPropMgr.Add2 "BS", 30, "0"
+customPropMgr.Add2 "ALT4", 30, "N/A"
+customPropMgr.Add2 "Z", 30, "0"
+customPropMgr.Add2 "J", 30, "0.0"
+customPropMgr.Add2 "ALT5", 30, "N/A"
+customPropMgr.Add2 "Q", 30, "0"
+customPropMgr.Add2 "R", 30, "0"
+customPropMgr.Add2 "S", 30, "0"
+customPropMgr.Add2 "T", 30, "0"
+customPropMgr.Add2 "ALT9", 30, "Not applicable"
+customPropMgr.Add2 "SRG", 30, "0.0"
+customPropMgr.Add2 "DD2", 30, "0.0"
+customPropMgr.Add2 "MM", 30, "0.00"
+customPropMgr.Add2 "NN", 30, "0.00"
+customPropMgr.Add2 "ALT6", 30, "N/A"
+customPropMgr.Add2 "LFC", 30, "0"
+customPropMgr.Add2 "LTC", 30, "0"
+customPropMgr.Add2 "MALT6", 30, "N/A"
+customPropMgr.Add2 "C", 30, "0.0"
+customPropMgr.Add2 "ALT7", 30, "Not applicable"
+customPropMgr.Add2 "KFC", 30, "0"
+customPropMgr.Add2 "KTC", 30, "0"
+customPropMgr.Add2 "K", 30, "0.0"
+customPropMgr.Add2 "ALT3", 30, "Not applicable"
+customPropMgr.Add2 "DIRALT3", 30, "N/A"
+customPropMgr.Add2 "QFC", 30, "0"
+customPropMgr.Add2 "QTC", 30, "0"
+customPropMgr.Add2 "MALT3", 30, "N/A"
+customPropMgr.Add2 "ALT8", 30, "Not applicable"
+customPropMgr.Add2 "DIRALT8", 30, "N/A"
+customPropMgr.Add2 "ZFC", 30, "0"
+customPropMgr.Add2 "ZTC", 30, "0"
+customPropMgr.Add2 "U", 30, "0"
+customPropMgr.Add2 "U1", 30, "0.0"
+customPropMgr.Add2 "U2", 30, "0.0"
+customPropMgr.Add2 "F", 30, "0.0"
+customPropMgr.Add2 "SUPPLIER", 30, "MISUMI"
+customPropMgr.Add2 "ARTICLENO", 30, "GEAB1.5-20-15-B-12_b"
+customPropMgr.Add2 "BOMINFO", 30, "GEAB1.5-20-15-B-12"
+customPropMgr.Add2 "CREATOR", 30, "CADENAS GmbH"
+customPropMgr.Add2 "IsFastener", 30, "0"
+part.SummaryInfo(0)="GEAB1.5-20-15-B-12"
+part.SummaryInfo(4)="Spur Gears - Pressure Angle 20 degree Module 1.5"
+part.SummaryInfo(2)="Cadenas PARTsolutions"
+valRGB=part.MaterialPropertyValues
+valRGB(0)=0.689999997615814
+valRGB(1)=0.689999997615814
+valRGB(2)=0.689999997615814
+valRGB(7)=0
+part.MaterialPropertyValues=valRGB
+Dim featMgr as object
+set featMgr = part.FeatureManager
+codeBag0 part,featMgr
+part.ActiveView.EnableGraphicsUpdate = true
+part.SketchManager.DisplayWhenAdded = true
+part.SketchManager.AddToDB = false
+part.EditRebuild3
+part.Rebuild swRebuildAll
+Set modelExt = part.Extension
+modelExt.SaveAs storePath & "GEAB1_5-20-15-B-12_b.sldprt",0,0,nothing,errors,warnings
+swApp.CloseDoc storePath &"GEAB1_5-20-15-B-12_b.sldprt"
+End Sub
+Sub CreatePart1
+dim errors as long
+dim warnings as long
+if (docVisible=0) then
+ swApp.DocumentVisible 0, 1
+end if
+set res=swApp.OpenDoc6 ( storePath & "SET-SCREW4-6.sldprt",1,3,"", errors, warnings)
+if not res is nothing then
+ if (docVisible=0) then
+  swApp.DocumentVisible 1, 1
+ end if
+ exit sub
+end if
+if (docVisible=0) then
+ swApp.DocumentVisible 1, 1
+end if
+Dim longstatus As Long
+Dim sPartTemplateName As String
+sPartTemplateName = swApp.GetUserPreferenceStringValue(8)
+Set part = swApp.NewDocument(sPartTemplateName, 0, 0, 0)
+swApp.ActivateDoc2 "SET-SCREW4-6.sldprt", False, longstatus
+Set part = swApp.ActiveDoc
+part.SketchManager.AddToDB = true
+part.SketchManager.DisplayWhenAdded = false
+part.ActiveView.EnableGraphicsUpdate = false
+Set modelExt = part.Extension
+Set customPropMgr = modelExt.CustomPropertyManager("")
+customPropMgr.Add2 "NB", 30, "SET-SCREW4-6"
+customPropMgr.Add2 "NN", 30, "SET-SCREW"
+customPropMgr.Add2 "NT", 30, "Set Screw - Flat End"
+customPropMgr.Add2 "NBSYN", 30, "$PN."
+customPropMgr.Add2 "LINA", 30, "SET-SCREW4-6"
+customPropMgr.Add2 "CATALOG", 30, "Misumi"
+customPropMgr.Add2 "PN", 30, "SET-SCREW4-6"
+customPropMgr.Add2 "M", 30, "4.0"
+customPropMgr.Add2 "P", 30, "0.70"
+customPropMgr.Add2 "L", 30, "6"
+customPropMgr.Add2 "B", 30, "2.0"
+customPropMgr.Add2 "C", 30, "1.5"
+customPropMgr.Add2 "DD", 30, "2.5"
+customPropMgr.Add2 "SUPPLIER", 30, "MISUMI"
+customPropMgr.Add2 "ARTICLENO", 30, "SET-SCREW4-6"
+customPropMgr.Add2 "BOMINFO", 30, "SET-SCREW4-6"
+customPropMgr.Add2 "CREATOR", 30, "CADENAS GmbH"
+customPropMgr.Add2 "IsFastener", 30, "0"
+part.SummaryInfo(0)="SET-SCREW4-6"
+part.SummaryInfo(4)="Set Screw - Flat End"
+part.SummaryInfo(2)="Cadenas PARTsolutions"
+valRGB=part.MaterialPropertyValues
+valRGB(0)=0.689999997615814
+valRGB(1)=0.689999997615814
+valRGB(2)=0.689999997615814
+valRGB(7)=0
+part.MaterialPropertyValues=valRGB
+Dim featMgr as object
+set featMgr = part.FeatureManager
+codeBag10 part,featMgr
+part.ActiveView.EnableGraphicsUpdate = true
+part.SketchManager.DisplayWhenAdded = true
+part.SketchManager.AddToDB = false
+part.EditRebuild3
+part.Rebuild swRebuildAll
+Set modelExt = part.Extension
+modelExt.SaveAs storePath & "SET-SCREW4-6.sldprt",0,0,nothing,errors,warnings
+swApp.CloseDoc storePath &"SET-SCREW4-6.sldprt"
+End Sub
+sub CreatePart2
+dim errors as long
+dim warnings as long
+set res=swApp.OpenDoc6 ( storePath & "GEAB1_5-20-15-B-12.sldasm",2,3,"", errors, warnings)
+if not res is nothing then
+ exit sub
+end if
+codeBag14 
+set part=swApp.NewAssembly
+Set modelExt = part.Extension
+Set customPropMgr = modelExt.CustomPropertyManager("")
+customPropMgr.Add2 "NB", 30, "GEAB1.5-20-15-B-12"
+customPropMgr.Add2 "NN", 30, "GEAHB1.5, GEAHBB1.5, GEAHBG1.5, GEAHS1.5, GEAB1.5, GEABB1.5, GEABG1.5, GEAS1.5, GEAKB1.5, GEAKBB1.5, GEAKBG1.5, GEAKS1.5"
+customPropMgr.Add2 "NT", 30, "Spur Gears - Pressure Angle 20 degree Module 1.5"
+customPropMgr.Add2 "NBSYN", 30, "$PN."
+customPropMgr.Add2 "LINA", 30, "GEAB1.5-20-15-B-12"
+customPropMgr.Add2 "CATALOG", 30, "Misumi"
+customPropMgr.Add2 "PN", 30, "GEAB1.5-20-15-B-12"
+customPropMgr.Add2 "SHS", 30, "Round Hole+Tap"
+customPropMgr.Add2 "MAT", 30, "S45C Equivalent"
+customPropMgr.Add2 "ST", 30, "-"
+customPropMgr.Add2 "MOD", 30, "1.5"
+customPropMgr.Add2 "NT", 30, "20"
+customPropMgr.Add2 "B", 30, "15"
+customPropMgr.Add2 "TS", 30, "width"
+customPropMgr.Add2 "PS", 30, "12"
+customPropMgr.Add2 "DD", 30, "30.0"
+customPropMgr.Add2 "D", 30, "33.0"
+customPropMgr.Add2 "G", 30, "26.25"
+customPropMgr.Add2 "H", 30, "25.0"
+customPropMgr.Add2 "L", 30, "27"
+customPropMgr.Add2 "LL1", 30, "12"
+customPropMgr.Add2 "LL2", 30, "5"
+customPropMgr.Add2 "M", 30, "M4"
+customPropMgr.Add2 "BB", 30, "4"
+customPropMgr.Add2 "TT", 30, "0.0"
+customPropMgr.Add2 "ALT1", 30, "w/o Set Screw"
+customPropMgr.Add2 "ALT2", 30, "w/o TPC (Tapped Hole Dimension)"
+customPropMgr.Add2 "TPC", 30, "N/A"
+customPropMgr.Add2 "ALT11", 30, "w/o GBA (Gear bottom adjustment of phase focus)"
+customPropMgr.Add2 "ALT10", 30, "w/o BS (Boss Cut)"
+customPropMgr.Add2 "BS", 30, "0.0"
+customPropMgr.Add2 "ALT4", 30, "N/A"
+customPropMgr.Add2 "Z", 30, "0"
+customPropMgr.Add2 "J", 30, "0.0"
+customPropMgr.Add2 "ALT5", 30, "N/A"
+customPropMgr.Add2 "Q", 30, "0"
+customPropMgr.Add2 "R", 30, "0"
+customPropMgr.Add2 "S", 30, "0"
+customPropMgr.Add2 "T", 30, "0"
+customPropMgr.Add2 "ALT9", 30, "Not applicable"
+customPropMgr.Add2 "SRG", 30, "0.0"
+customPropMgr.Add2 "DD2", 30, "0.0"
+customPropMgr.Add2 "MM", 30, "0.00"
+customPropMgr.Add2 "NN", 30, "0.00"
+customPropMgr.Add2 "ALT6", 30, "N/A"
+customPropMgr.Add2 "LFC", 30, "0"
+customPropMgr.Add2 "LTC", 30, "0"
+customPropMgr.Add2 "MALT6", 30, "N/A"
+customPropMgr.Add2 "C", 30, "0.0"
+customPropMgr.Add2 "ALT7", 30, "Not applicable"
+customPropMgr.Add2 "KFC", 30, "0"
+customPropMgr.Add2 "KTC", 30, "0"
+customPropMgr.Add2 "K", 30, "0.0"
+customPropMgr.Add2 "ALT3", 30, "Not applicable"
+customPropMgr.Add2 "DIRALT3", 30, "N/A"
+customPropMgr.Add2 "QFC", 30, "0"
+customPropMgr.Add2 "QTC", 30, "0"
+customPropMgr.Add2 "MALT3", 30, "N/A"
+customPropMgr.Add2 "ALT8", 30, "Not applicable"
+customPropMgr.Add2 "DIRALT8", 30, "N/A"
+customPropMgr.Add2 "ZFC", 30, "0"
+customPropMgr.Add2 "ZTC", 30, "0"
+customPropMgr.Add2 "U", 30, "0"
+customPropMgr.Add2 "U1", 30, "0.0"
+customPropMgr.Add2 "U2", 30, "0.0"
+customPropMgr.Add2 "F", 30, "0.0"
+customPropMgr.Add2 "SUPPLIER", 30, "MISUMI"
+customPropMgr.Add2 "ARTICLENO", 30, "GEAB1.5-20-15-B-12"
+customPropMgr.Add2 "BOMINFO", 30, "GEAB1.5-20-15-B-12"
+customPropMgr.Add2 "CREATOR", 30, "CADENAS GmbH"
+part.SummaryInfo(0)="GEAB1.5-20-15-B-12"
+part.SummaryInfo(4)="Spur Gears - Pressure Angle 20 degree Module 1.5"
+part.SummaryInfo(2)="Cadenas PARTsolutions"
+if (docVisible=0) then
+ swApp.DocumentVisible 0, 1
+end if
+codeBag15 part
+codeBag16 
+if (docVisible=0) then
+ swApp.DocumentVisible 1, 1
+end if
+part.EditRebuild3
+part.Rebuild swRebuildAll
+Set modelExt = part.Extension
+modelExt.SaveAs storePath & "GEAB1_5-20-15-B-12.sldasm",0,0,nothing,errors,warnings
+end sub
+sub codeBag1(part,wMat)
+cLn part,wMat,-0.027,0,-0.027,0.0122
+cLn part,wMat,-0.027,0.0122,-0.0267,0.0125
+cLn part,wMat,-0.0267,0.0125,-0.015,0.0125
+cLn part,wMat,-0.015,0.0125,-0.015,0.0149999999999999
+cLn part,wMat,-0.015,0.0149999999999999,-0.0132583302491977,0.0215
+cLn part,wMat,-0.0132583302491977,0.0215,-0.00174166975080231,0.0215
+cLn part,wMat,-0.00174166975080231,0.0215,0,0.0149999999999999
+cLn part,wMat,0,0.0149999999999999,0,0
+cLn part,wMat,0,0,-0.027,0
+cCLn part,wMat,0.5,0,-0.5,0
+Part.SketchManager.InsertSketch True
+end sub
+
+sub codeBag2(part,wMat)
+cCir part,wMat,0,0,0.066
+cArc part,wMat,-0.016495806473315,0.000371979562527394,-0.0165,-1.68587483404166e-10,-0.0164958064729587,-0.000371979578328443
+cArc part,wMat,-0.0164958064729587,-0.000371979578328443,-0.0164776291890792,-0.00044024165458683,-0.0164302243213545,-0.000492614323497241
+cArc part,wMat,-0.0164302243213545,-0.000492614323497241,-0.0157200171919588,-0.00089522046693209,-0.0149537600059969,-0.00117688643591767
+cArc part,wMat,-0.0149537600059969,-0.00117688643591767,-0.0147658724275557,-0.00121342717250791,-0.0145745844440875,-0.00122016324279824
+cArc part,wMat,-0.0145745844440875,-0.00122016324279824,-0.0140821024681263,-0.00122616891149579,-0.0135933083158138,-0.00128662919860231
+cArc part,wMat,-0.0135933083158138,-0.00128662919860231,-0.013187715041737,-0.00150294981611149,-0.0129845051221312,-0.00191526805783158
+cArc part,wMat,-0.0129845051221312,-0.00191526805783158,-0.0129634094703112,-0.00205320235365297,-0.0129408485859241,-0.00219090457943438
+cArc part,wMat,-0.0129408485859241,-0.00219090457943438,-0.0130066993603587,-0.00264583784859341,-0.0133255948305517,-0.00297690624480747
+cArc part,wMat,-0.0133255948305517,-0.00297690624480747,-0.013771782347074,-0.00318545304582382,-0.0142383046857797,-0.00334335007616869
+cArc part,wMat,-0.0142383046857797,-0.00334335007616869,-0.014418148808751,-0.00340886769742391,-0.0145855488059651,-0.00350168045783858
+cArc part,wMat,-0.0145855488059651,-0.00350168045783858,-0.0152272631246785,-0.00400634720558504,-0.0157782980724434,-0.00460871443532497
+cArc part,wMat,-0.0157782980724434,-0.00460871443532497,-0.015807198766268,-0.00467317275209477,-0.0158033922443712,-0.00474371094930431
+cArc part,wMat,-0.0158033922443712,-0.00474371094930431,-0.0156924324667737,-0.00509878056752279,-0.0155734962263872,-0.00545125813796249
+cArc part,wMat,-0.0155734962263872,-0.00545125813796249,-0.0155351144604699,-0.00551056214077351,-0.0154738457073821,-0.0055457225990735
+cArc part,wMat,-0.0154738457073821,-0.0055457225990735,-0.0146739864486899,-0.00570915772277816,-0.0138581929876693,-0.00574025148547634
+cArc part,wMat,-0.0138581929876693,-0.00574025148547634,-0.0136682095732685,-0.00571694333635041,-0.0134842023299071,-0.00566423848218288
+cArc part,wMat,-0.0134842023299071,-0.00566423848218288,-0.0130139682838212,-0.00551776491253703,-0.0125304142662265,-0.00542422037671296
+cArc part,wMat,-0.0125304142662265,-0.00542422037671296,-0.0120778252906164,-0.00550461828114828,-0.0117571478286172,-0.00583396091313977
+cArc part,wMat,-0.0117571478286172,-0.00583396091313977,-0.0116944606299723,-0.00595862530908165,-0.0116304516259329,-0.00608261621153551
+cArc part,wMat,-0.0116304516259329,-0.00608261621153551,-0.0115524973225853,-0.00653563247004172,-0.0117534791767988,-0.00694904134531931
+cArc part,wMat,-0.0117534791767988,-0.00694904134531931,-0.0121133842162403,-0.00728526066466176,-0.0125082804607257,-0.00757959299519051
+cArc part,wMat,-0.0125082804607257,-0.00757959299519051,-0.0126590763273961,-0.00769747884615405,-0.0127896024653114,-0.00783747847073922
+cArc part,wMat,-0.0127896024653114,-0.00783747847073922,-0.0132439584481741,-0.00851574569975715,-0.013581882115108,-0.00925891014215783
+cArc part,wMat,-0.013581882115108,-0.00925891014215783,-0.0135894495929847,-0.00932914444989221,-0.0135640318828393,-0.00939505396904771
+cArc part,wMat,-0.0135640318828393,-0.00939505396904771,-0.0133487803080935,-0.00969845679921584,-0.0131267436622484,-0.00999692956990398
+cArc part,wMat,-0.0131267436622484,-0.00999692956990398,-0.0130719144889627,-0.0100414704102772,-0.0130027792629487,-0.0100559769073311
+cArc part,wMat,-0.0130027792629487,-0.0100559769073311,-0.0121915636721479,-0.00996424284267784,-0.011406089562956,-0.00974172075447302
+cArc part,wMat,-0.011406089562956,-0.00974172075447302,-0.011232607133934,-0.00966084525414461,-0.0110738925417134,-0.00955385859386135
+cArc part,wMat,-0.0110738925417134,-0.00955385859386135,-0.0106719362102468,-0.00926924363941041,-0.0102409558621333,-0.00903085108991608
+cArc part,wMat,-0.0102409558621333,-0.00903085108991608,-0.0097856738488933,-0.00896745635589551,-0.0093789189887724,-0.00918158502667402
+cArc part,wMat,-0.0093789189887724,-0.00918158502667402,-0.00928077650307347,-0.00928077650307341,-0.00918158502667402,-0.0093789189887724
+cArc part,wMat,-0.00918158502667402,-0.0093789189887724,-0.0089674563558955,-0.00978567384889332,-0.00903085110113802,-0.0102409558853755
+cArc part,wMat,-0.00903085110113802,-0.0102409558853755,-0.00926924363941041,-0.0106719362102468,-0.00955385859386136,-0.0110738925417134
+cArc part,wMat,-0.00955385859386136,-0.0110738925417134,-0.00966084525414452,-0.0112326071339339,-0.00974172072495275,-0.0114060894840005
+cArc part,wMat,-0.00974172072495275,-0.0114060894840005,-0.00996424284267784,-0.0121915636721479,-0.0100559769058087,-0.013002779213656
+cArc part,wMat,-0.0100559769058087,-0.013002779213656,-0.0100414704102772,-0.0130719144889627,-0.00999692956990399,-0.0131267436622484
+cArc part,wMat,-0.00999692956990399,-0.0131267436622484,-0.00969845652643575,-0.0133487805062798,-0.00939505396904771,-0.0135640318828393
+cArc part,wMat,-0.00939505396904771,-0.0135640318828393,-0.00932914444989222,-0.0135894495929847,-0.00925891019067146,-0.0135818821325443
+cArc part,wMat,-0.00925891019067146,-0.0135818821325443,-0.00851574569975716,-0.013243958448174,-0.00783747853670817,-0.0127896025177854
+cArc part,wMat,-0.00783747853670817,-0.0127896025177854,-0.00769747884615412,-0.0126590763273962,-0.00757959299519051,-0.0125082804607257
+cArc part,wMat,-0.00757959299519051,-0.0125082804607257,-0.00728526066466176,-0.0121133842162403,-0.00694904134531932,-0.0117534791767988
+cArc part,wMat,-0.00694904134531932,-0.0117534791767988,-0.0065356324700417,-0.0115524973225853,-0.00608261621153552,-0.0116304516259329
+cArc part,wMat,-0.00608261621153552,-0.0116304516259329,-0.00595862530908157,-0.0116944606299723,-0.00583396112671101,-0.011757147722642
+cArc part,wMat,-0.00583396112671101,-0.011757147722642,-0.00550461828114827,-0.0120778252906164,-0.00542422037322249,-0.012530414240654
+cArc part,wMat,-0.00542422037322249,-0.012530414240654,-0.00551776491253703,-0.0130139682838212,-0.00566423848218288,-0.0134842023299071
+cArc part,wMat,-0.00566423848218288,-0.0134842023299071,-0.00571694333635041,-0.0136682095732685,-0.00574025148547635,-0.0138581929876693
+cArc part,wMat,-0.00574025148547635,-0.0138581929876693,-0.00570915772277816,-0.0146739864486899,-0.00554572261285793,-0.0154738456600316
+cArc part,wMat,-0.00554572261285793,-0.0154738456600316,-0.00551056214077351,-0.0155351144604699,-0.0054512581379625,-0.0155734962263872
+cArc part,wMat,-0.0054512581379625,-0.0155734962263872,-0.00509878024685054,-0.0156924325709664,-0.00474371061122679,-0.015803392345852
+cArc part,wMat,-0.00474371061122679,-0.015803392345852,-0.00467317275209515,-0.0158071987662683,-0.00460871447430874,-0.0157782981026485
+cArc part,wMat,-0.00460871447430874,-0.0157782981026485,-0.00400634720558505,-0.0152272631246785,-0.00350168050436339,-0.0145855488762565
+cArc part,wMat,-0.00350168050436339,-0.0145855488762565,-0.00340886769742395,-0.0144181488087512,-0.00334335007616869,-0.0142383046857797
+cArc part,wMat,-0.00334335007616869,-0.0142383046857797,-0.00318545304582382,-0.013771782347074,-0.00297690624480748,-0.0133255948305517
+cArc part,wMat,-0.00297690624480748,-0.0133255948305517,-0.0026458378485934,-0.0130066993603587,-0.00219090457943439,-0.0129408485859241
+cArc part,wMat,-0.00219090457943439,-0.0129408485859241,-0.00205320235365302,-0.0129634094703112,-0.00191526805783159,-0.0129845051221311
+cArc part,wMat,-0.00191526805783159,-0.0129845051221311,-0.00150294981611149,-0.013187715041737,-0.00128662918027154,-0.0135933084174116
+cArc part,wMat,-0.00128662918027154,-0.0135933084174116,-0.00122616891149579,-0.0140821024681263,-0.00122016324279824,-0.0145745844440875
+cArc part,wMat,-0.00122016324279824,-0.0145745844440875,-0.00121342717250791,-0.0147658724275557,-0.00117688643591768,-0.0149537600059969
+cArc part,wMat,-0.00117688643591768,-0.0149537600059969,-0.000895220466932105,-0.0157200171919588,-0.000492614351239126,-0.0164302242805811
+cArc part,wMat,-0.000492614351239126,-0.0164302242805811,-0.000440241654586834,-0.0164776291890791,-0.000371979594129496,-0.0164958064726024
+end sub
+
+sub codeBag3(part,wMat)
+cArc part,wMat,-0.000371979594129496,-0.0164958064726024,1.68587398726855e-10,-0.0165,0.000371979915417536,-0.0164958064653574
+cArc part,wMat,0.000371979915417536,-0.0164958064653574,0.000440241654586564,-0.0164776291890795,0.000492614323497241,-0.0164302243213545
+cArc part,wMat,0.000492614323497241,-0.0164302243213545,0.000895220466932089,-0.0157200171919588,0.00117688643591767,-0.0149537600059969
+cArc part,wMat,0.00117688643591767,-0.0149537600059969,0.00121342717250791,-0.0147658724275557,0.00122016324279824,-0.0145745844440875
+cArc part,wMat,0.00122016324279824,-0.0145745844440875,0.00122616891149579,-0.0140821024681263,0.00128662918027153,-0.0135933084174116
+cArc part,wMat,0.00128662918027153,-0.0135933084174116,0.00150294981611149,-0.013187715041737,0.00191526805783158,-0.0129845051221311
+cArc part,wMat,0.00191526805783158,-0.0129845051221311,0.00205320235365305,-0.0129634094703112,0.00219090457943438,-0.0129408485859241
+cArc part,wMat,0.00219090457943438,-0.0129408485859241,0.00264583784859341,-0.0130066993603587,0.00297690624480747,-0.0133255948305517
+cArc part,wMat,0.00297690624480747,-0.0133255948305517,0.00318545304582382,-0.013771782347074,0.00334335007616869,-0.0142383046857797
+cArc part,wMat,0.00334335007616869,-0.0142383046857797,0.00340886769742391,-0.0144181488087511,0.00350168045783857,-0.0145855488059651
+cArc part,wMat,0.00350168045783857,-0.0145855488059651,0.00400634720558503,-0.0152272631246785,0.00460871443532497,-0.0157782980724434
+cArc part,wMat,0.00460871443532497,-0.0157782980724434,0.00467317275209477,-0.015807198766268,0.00474371091902871,-0.015803392253459
+cArc part,wMat,0.00474371091902871,-0.015803392253459,0.00509878056752288,-0.0156924324667736,0.00545125813796249,-0.0155734962263872
+cArc part,wMat,0.00545125813796249,-0.0155734962263872,0.0055105621407735,-0.0155351144604699,0.00554572260007329,-0.0154738457039478
+cArc part,wMat,0.00554572260007329,-0.0154738457039478,0.00570915772277815,-0.0146739864486899,0.00574025148915318,-0.0138581930718828
+cArc part,wMat,0.00574025148915318,-0.0138581930718828,0.00571694333635046,-0.0136682095732686,0.00566423848218288,-0.0134842023299071
+cArc part,wMat,0.00566423848218288,-0.0134842023299071,0.00551776491253703,-0.0130139682838212,0.00542422037671296,-0.0125304142662265
+cArc part,wMat,0.00542422037671296,-0.0125304142662265,0.00550461828114828,-0.0120778252906164,0.00583396091313977,-0.0117571478286172
+cArc part,wMat,0.00583396091313977,-0.0117571478286172,0.00595862530908159,-0.0116944606299723,0.00608261621153551,-0.0116304516259329
+cArc part,wMat,0.00608261621153551,-0.0116304516259329,0.00653563247004172,-0.0115524973225853,0.0069490413453193,-0.0117534791767988
+cArc part,wMat,0.0069490413453193,-0.0117534791767988,0.00728526066466176,-0.0121133842162403,0.00757959299519051,-0.0125082804607257
+cArc part,wMat,0.00757959299519051,-0.0125082804607257,0.00769747884615405,-0.0126590763273961,0.00783747847073922,-0.0127896024653114
+cArc part,wMat,0.00783747847073922,-0.0127896024653114,0.00851574569975714,-0.013243958448174,0.00925891014215783,-0.013581882115108
+cArc part,wMat,0.00925891014215783,-0.013581882115108,0.00932914444989221,-0.0135894495929847,0.00939505396904771,-0.0135640318828393
+cArc part,wMat,0.00939505396904771,-0.0135640318828393,0.00969845679921582,-0.0133487803080935,0.00999692956990398,-0.0131267436622484
+cArc part,wMat,0.00999692956990398,-0.0131267436622484,0.0100414704102772,-0.0130719144889627,0.0100559769071424,-0.0130027792568391
+cArc part,wMat,0.0100559769071424,-0.0130027792568391,0.00996424284267783,-0.0121915636721479,0.00974172075447302,-0.011406089562956
+cArc part,wMat,0.00974172075447302,-0.011406089562956,0.00966084525414461,-0.011232607133934,0.00955385859386135,-0.0110738925417134
+cArc part,wMat,0.00955385859386135,-0.0110738925417134,0.00926924363941041,-0.0106719362102468,0.00903085108991608,-0.0102409558621333
+cArc part,wMat,0.00903085108991608,-0.0102409558621333,0.00896745635589551,-0.0097856738488933,0.00918158502667402,-0.0093789189887724
+cArc part,wMat,0.00918158502667402,-0.0093789189887724,0.00928077650307341,-0.00928077650307347,0.0093789189887724,-0.00918158502667402
+cArc part,wMat,0.0093789189887724,-0.00918158502667402,0.00978567384889331,-0.0089674563558955,0.0102409558621333,-0.00903085108991607
+cArc part,wMat,0.0102409558621333,-0.00903085108991607,0.0106719362102468,-0.00926924363941041,0.0110738925417134,-0.00955385859386135
+cArc part,wMat,0.0110738925417134,-0.00955385859386135,0.0112326071339339,-0.00966084525414453,0.0114060894840004,-0.00974172072495275
+cArc part,wMat,0.0114060894840004,-0.00974172072495275,0.0121915636721479,-0.00996424284267784,0.013002779213656,-0.0100559769058087
+cArc part,wMat,0.013002779213656,-0.0100559769058087,0.0130719144889627,-0.0100414704102772,0.0131267436622484,-0.00999692956990399
+cArc part,wMat,0.0131267436622484,-0.00999692956990399,0.0133487805062798,-0.00969845652643576,0.0135640318828393,-0.00939505396904771
+cArc part,wMat,0.0135640318828393,-0.00939505396904771,0.0135894495929847,-0.00932914444989222,0.0135818821297207,-0.00925891018281531
+cArc part,wMat,0.0135818821297207,-0.00925891018281531,0.013243958448174,-0.00851574569975716,0.0127896025177854,-0.00783747853670816
+cArc part,wMat,0.0127896025177854,-0.00783747853670816,0.0126590763273962,-0.00769747884615412,0.0125082804607257,-0.00757959299519051
+cArc part,wMat,0.0125082804607257,-0.00757959299519051,0.0121133842162403,-0.00728526066466176,0.0117534791767988,-0.00694904134531932
+cArc part,wMat,0.0117534791767988,-0.00694904134531932,0.0115524973225853,-0.0065356324700417,0.0116304516259329,-0.00608261621153552
+cArc part,wMat,0.0116304516259329,-0.00608261621153552,0.0116944606299724,-0.00595862530908149,0.011757147722642,-0.00583396112671101
+cArc part,wMat,0.011757147722642,-0.00583396112671101,0.0120778252906164,-0.00550461828114827,0.0125304142349067,-0.00542422037243802
+cArc part,wMat,0.0125304142349067,-0.00542422037243802,0.0130139682838212,-0.00551776491253703,0.0134842023299071,-0.00566423848218288
+cArc part,wMat,0.0134842023299071,-0.00566423848218288,0.0136682095732685,-0.00571694333635042,0.0138581929876693,-0.00574025148547635
+cArc part,wMat,0.0138581929876693,-0.00574025148547635,0.0146739864486899,-0.00570915772277817,0.0154738456600316,-0.00554572261285793
+cArc part,wMat,0.0154738456600316,-0.00554572261285793,0.0155351144604699,-0.00551056214077351,0.0155734962263872,-0.0054512581379625
+cArc part,wMat,0.0155734962263872,-0.0054512581379625,0.0156924325709664,-0.00509878024685054,0.015803392345852,-0.00474371061122679
+cArc part,wMat,0.015803392345852,-0.00474371061122679,0.0158071987662683,-0.00467317275209515,0.0157782980989047,-0.00460871446947696
+cArc part,wMat,0.0157782980989047,-0.00460871446947696,0.0152272631246785,-0.00400634720558504,0.0145855488762565,-0.00350168050436339
+cArc part,wMat,0.0145855488762565,-0.00350168050436339,0.0144181488087512,-0.00340886769742395,0.0142383046857797,-0.00334335007616869
+cArc part,wMat,0.0142383046857797,-0.00334335007616869,0.013771782347074,-0.00318545304582382,0.0133255948305517,-0.00297690624480748
+cArc part,wMat,0.0133255948305517,-0.00297690624480748,0.0130066993603587,-0.0026458378485934,0.0129408485859241,-0.00219090457943439
+cArc part,wMat,0.0129408485859241,-0.00219090457943439,0.0129634094703112,-0.00205320235365302,0.0129845051221311,-0.00191526805783159
+cArc part,wMat,0.0129845051221311,-0.00191526805783159,0.013187715041737,-0.00150294981611149,0.0135933083734185,-0.001286629188209
+cArc part,wMat,0.0135933083734185,-0.001286629188209,0.0140821024681263,-0.00122616891149579,0.0145745844440875,-0.00122016324279825
+cArc part,wMat,0.0145745844440875,-0.00122016324279825,0.0147658724275557,-0.00121342717250791,0.0149537600059969,-0.00117688643591768
+cArc part,wMat,0.0149537600059969,-0.00117688643591768,0.0157200171919588,-0.00089522046693211,0.0164302242805811,-0.000492614351239126
+cArc part,wMat,0.0164302242805811,-0.000492614351239126,0.0164776291890791,-0.000440241654586838,0.0164958064726024,-0.000371979594129496
+cArc part,wMat,0.0164958064726024,-0.000371979594129496,0.0165,1.68587398105099e-10,0.0164958064653574,0.000371979915417535
+end sub
+
+sub codeBag4(part,wMat)
+cArc part,wMat,0.0164958064653574,0.000371979915417535,0.0164776291890795,0.000440241654586555,0.0164302243104029,0.000492614330948632
+cArc part,wMat,0.0164302243104029,0.000492614330948632,0.0157200171919588,0.000895220466932087,0.0149537600059969,0.00117688643591767
+cArc part,wMat,0.0149537600059969,0.00117688643591767,0.0147658724275557,0.00121342717250791,0.0145745844440875,0.00122016324279824
+cArc part,wMat,0.0145745844440875,0.00122016324279824,0.0140821024681263,0.00122616891149579,0.0135933084174116,0.00128662918027153
+cArc part,wMat,0.0135933084174116,0.00128662918027153,0.013187715041737,0.00150294981611149,0.0129845051221312,0.00191526805783158
+cArc part,wMat,0.0129845051221312,0.00191526805783158,0.0129634094703112,0.00205320235365297,0.0129408485859241,0.00219090457943438
+cArc part,wMat,0.0129408485859241,0.00219090457943438,0.0130066993603587,0.00264583784859341,0.0133255948078115,0.00297690623260021
+cArc part,wMat,0.0133255948078115,0.00297690623260021,0.013771782347074,0.00318545304582381,0.0142383046857797,0.00334335007616869
+cArc part,wMat,0.0142383046857797,0.00334335007616869,0.0144181488087511,0.00340886769742391,0.0145855488059651,0.00350168045783857
+cArc part,wMat,0.0145855488059651,0.00350168045783857,0.0152272631246785,0.00400634720558502,0.0157782980724434,0.00460871443532497
+cArc part,wMat,0.0157782980724434,0.00460871443532497,0.015807198766268,0.00467317275209477,0.015803392253459,0.00474371091902871
+cArc part,wMat,0.015803392253459,0.00474371091902871,0.0156924324667736,0.00509878056752287,0.0155734962263872,0.00545125813796249
+cArc part,wMat,0.0155734962263872,0.00545125813796249,0.0155351144604699,0.00551056214077349,0.0154738456946639,0.00554572260277596
+cArc part,wMat,0.0154738456946639,0.00554572260277596,0.0146739864486899,0.00570915772277815,0.0138581930718828,0.00574025148915317
+cArc part,wMat,0.0138581930718828,0.00574025148915317,0.0136682095732686,0.00571694333635046,0.0134842023299071,0.00566423848218287
+cArc part,wMat,0.0134842023299071,0.00566423848218287,0.0130139682838212,0.00551776491253702,0.0125304142662265,0.00542422037671295
+cArc part,wMat,0.0125304142662265,0.00542422037671295,0.0120778252906164,0.00550461828114828,0.0117571478286172,0.00583396091313977
+cArc part,wMat,0.0117571478286172,0.00583396091313977,0.0116944606299723,0.0059586253090816,0.0116304516259329,0.00608261621153551
+cArc part,wMat,0.0116304516259329,0.00608261621153551,0.0115524973225853,0.00653563247004171,0.0117534791767988,0.0069490413453193
+cArc part,wMat,0.0117534791767988,0.0069490413453193,0.0121133842162403,0.00728526066466176,0.0125082804607257,0.0075795929951905
+cArc part,wMat,0.0125082804607257,0.0075795929951905,0.0126590763273961,0.00769747884615405,0.0127896024653114,0.00783747847073922
+cArc part,wMat,0.0127896024653114,0.00783747847073922,0.013243958448174,0.00851574569975714,0.013581882115108,0.00925891014215783
+cArc part,wMat,0.013581882115108,0.00925891014215783,0.0135894495929847,0.00932914444989221,0.0135640318828393,0.00939505396904771
+cArc part,wMat,0.0135640318828393,0.00939505396904771,0.0133487803080935,0.00969845679921579,0.0131267434579628,0.00999692983814683
+cArc part,wMat,0.0131267434579628,0.00999692983814683,0.0130719144889632,0.0100414704102772,0.0130027792497088,0.0100559769069222
+cArc part,wMat,0.0130027792497088,0.0100559769069222,0.0121915636721479,0.00996424284267783,0.011406089562956,0.00974172075447301
+cArc part,wMat,0.011406089562956,0.00974172075447301,0.011232607133934,0.00966084525414461,0.0110738925417134,0.00955385859386135
+cArc part,wMat,0.0110738925417134,0.00955385859386135,0.0106719362102468,0.0092692436394104,0.0102409558621333,0.00903085108991608
+cArc part,wMat,0.0102409558621333,0.00903085108991608,0.0097856738488933,0.0089674563558955,0.0093789189887724,0.00918158502667402
+cArc part,wMat,0.0093789189887724,0.00918158502667402,0.00928077650307343,0.00928077650307345,0.00918158502667402,0.0093789189887724
+cArc part,wMat,0.00918158502667402,0.0093789189887724,0.00896745635589551,0.00978567384889331,0.00903085107869412,0.010240955838891
+cArc part,wMat,0.00903085107869412,0.010240955838891,0.00926924363941041,0.0106719362102468,0.00955385859386135,0.0110738925417134
+cArc part,wMat,0.00955385859386135,0.0110738925417134,0.00966084525414453,0.0112326071339339,0.00974172072495275,0.0114060894840004
+cArc part,wMat,0.00974172072495275,0.0114060894840004,0.00996424284267784,0.0121915636721479,0.0100559769058087,0.013002779213656
+cArc part,wMat,0.0100559769058087,0.013002779213656,0.0100414704102772,0.0130719144889627,0.00999692956990399,0.0131267436622484
+cArc part,wMat,0.00999692956990399,0.0131267436622484,0.00969845652643575,0.0133487805062798,0.00939505369186895,0.0135640320748257
+cArc part,wMat,0.00939505369186895,0.0135640320748257,0.00932914444989266,0.0135894495929848,0.0092589101788845,0.0135818821283079
+cArc part,wMat,0.0092589101788845,0.0135818821283079,0.00851574569975716,0.013243958448174,0.00783747853670817,0.0127896025177854
+cArc part,wMat,0.00783747853670817,0.0127896025177854,0.00769747884615412,0.0126590763273962,0.00757959299519051,0.0125082804607257
+cArc part,wMat,0.00757959299519051,0.0125082804607257,0.00728526066466176,0.0121133842162403,0.00694904134531932,0.0117534791767988
+cArc part,wMat,0.00694904134531932,0.0117534791767988,0.00653563247004171,0.0115524973225853,0.00608261621153552,0.0116304516259329
+cArc part,wMat,0.00608261621153552,0.0116304516259329,0.00595862530908151,0.0116944606299724,0.00583396112671101,0.011757147722642
+cArc part,wMat,0.00583396112671101,0.011757147722642,0.00550461828114827,0.0120778252906164,0.00542422036958807,0.0125304142140269
+cArc part,wMat,0.00542422036958807,0.0125304142140269,0.00551776491253703,0.0130139682838212,0.00566423848218288,0.0134842023299071
+cArc part,wMat,0.00566423848218288,0.0134842023299071,0.00571694333635042,0.0136682095732685,0.00574025148547635,0.0138581929876693
+cArc part,wMat,0.00574025148547635,0.0138581929876693,0.00570915772277817,0.0146739864486899,0.00554572261285793,0.0154738456600316
+cArc part,wMat,0.00554572261285793,0.0154738456600316,0.00551056214077351,0.0155351144604699,0.0054512581379625,0.0155734962263872
+cArc part,wMat,0.0054512581379625,0.0155734962263872,0.00509878024685051,0.0156924325709664,0.00474371093416652,0.0158033922489151
+cArc part,wMat,0.00474371093416652,0.0158033922489151,0.00467317275209479,0.015807198766268,0.00460871446383781,0.0157782980945355
+cArc part,wMat,0.00460871446383781,0.0157782980945355,0.00400634720558505,0.0152272631246785,0.00350168050436339,0.0145855488762564
+cArc part,wMat,0.00350168050436339,0.0145855488762564,0.00340886769742395,0.0144181488087512,0.0033433500761687,0.0142383046857797
+cArc part,wMat,0.0033433500761687,0.0142383046857797,0.00318545304582382,0.013771782347074,0.00297690624480749,0.0133255948305517
+cArc part,wMat,0.00297690624480749,0.0133255948305517,0.00264583784859341,0.0130066993603587,0.00219090457943439,0.0129408485859241
+cArc part,wMat,0.00219090457943439,0.0129408485859241,0.00205320235365305,0.0129634094703112,0.00191526805783159,0.0129845051221311
+cArc part,wMat,0.00191526805783159,0.0129845051221311,0.00150294981611149,0.013187715041737,0.00128662918588417,0.0135933083863038
+cArc part,wMat,0.00128662918588417,0.0135933083863038,0.00122616891149579,0.0140821024681263,0.00122016324279824,0.0145745844440875
+cArc part,wMat,0.00122016324279824,0.0145745844440875,0.00121342717250791,0.0147658724275557,0.00117688643591767,0.0149537600059969
+cArc part,wMat,0.00117688643591767,0.0149537600059969,0.000895220466932098,0.0157200171919588,0.000492614351239123,0.0164302242805811
+cArc part,wMat,0.000492614351239123,0.0164302242805811,0.000440241654586829,0.0164776291890791,0.000371979542171609,0.016495806473774
+cArc part,wMat,0.000371979542171609,0.016495806473774,-1.68587539404945e-10,0.0165,-0.000371979915417538,0.0164958064653574
+cArc part,wMat,-0.000371979915417538,0.0164958064653574,-0.000440241654586574,0.0164776291890795,-0.000492614378980988,0.0164302242398077
+cArc part,wMat,-0.000492614378980988,0.0164302242398077,-0.000895220466932092,0.0157200171919588,-0.00117688643591767,0.0149537600059969
+cArc part,wMat,-0.00117688643591767,0.0149537600059969,-0.00121342717250791,0.0147658724275557,-0.00122016324279824,0.0145745844440875
+end sub
+
+sub codeBag5(part,wMat)
+cArc part,wMat,-0.00122016324279824,0.0145745844440875,-0.00122616891149579,0.0140821024681263,-0.00128662918027154,0.0135933084174116
+cArc part,wMat,-0.00128662918027154,0.0135933084174116,-0.0015029498161115,0.013187715041737,-0.00191526805783158,0.0129845051221312
+cArc part,wMat,-0.00191526805783158,0.0129845051221312,-0.00205320235365297,0.0129634094703112,-0.00219090457943438,0.0129408485859241
+cArc part,wMat,-0.00219090457943438,0.0129408485859241,-0.00264583784859341,0.0130066993603587,-0.00297690623260021,0.0133255948078115
+cArc part,wMat,-0.00297690623260021,0.0133255948078115,-0.00318545304582382,0.013771782347074,-0.00334335007616869,0.0142383046857797
+cArc part,wMat,-0.00334335007616869,0.0142383046857797,-0.00340886769742391,0.014418148808751,-0.00350168045783858,0.0145855488059651
+cArc part,wMat,-0.00350168045783858,0.0145855488059651,-0.00400634720558504,0.0152272631246785,-0.00460871443532497,0.0157782980724434
+cArc part,wMat,-0.00460871443532497,0.0157782980724434,-0.00467317275209478,0.015807198766268,-0.00474371094930431,0.0158033922443712
+cArc part,wMat,-0.00474371094930431,0.0158033922443712,-0.00509878056752275,0.0156924324667737,-0.00545125845620433,0.0155734961149917
+cArc part,wMat,-0.00545125845620433,0.0155734961149917,-0.00551056214077338,0.0155351144604703,-0.0055457226000733,0.0154738457039478
+cArc part,wMat,-0.0055457226000733,0.0154738457039478,-0.00570915772277816,0.0146739864486899,-0.00574025148547634,0.0138581929876693
+cArc part,wMat,-0.00574025148547634,0.0138581929876693,-0.00571694333635041,0.0136682095732685,-0.00566423848218288,0.0134842023299071
+cArc part,wMat,-0.00566423848218288,0.0134842023299071,-0.00551776491253703,0.0130139682838212,-0.00542422037671296,0.0125304142662265
+cArc part,wMat,-0.00542422037671296,0.0125304142662265,-0.00550461828114828,0.0120778252906164,-0.00583396091313977,0.0117571478286172
+cArc part,wMat,-0.00583396091313977,0.0117571478286172,-0.00595862530908157,0.0116944606299723,-0.00608261621153551,0.0116304516259329
+cArc part,wMat,-0.00608261621153551,0.0116304516259329,-0.00653563247004172,0.0115524973225853,-0.00694904134531931,0.0117534791767988
+cArc part,wMat,-0.00694904134531931,0.0117534791767988,-0.00728526066466177,0.0121133842162403,-0.00757959299519051,0.0125082804607257
+cArc part,wMat,-0.00757959299519051,0.0125082804607257,-0.00769747884615404,0.0126590763273961,-0.00783747847073923,0.0127896024653114
+cArc part,wMat,-0.00783747847073923,0.0127896024653114,-0.00851574569975715,0.0132439584481741,-0.00925891014215783,0.013581882115108
+cArc part,wMat,-0.00925891014215783,0.013581882115108,-0.00932914444989222,0.0135894495929847,-0.00939505398204047,0.0135640318738399
+cArc part,wMat,-0.00939505398204047,0.0135640318738399,-0.0096984567992159,0.0133487803080934,-0.00999692956990399,0.0131267436622484
+cArc part,wMat,-0.00999692956990399,0.0131267436622484,-0.0100414704102772,0.0130719144889627,-0.0100559769073311,0.0130027792629487
+cArc part,wMat,-0.0100559769073311,0.0130027792629487,-0.00996424284267784,0.0121915636721479,-0.00974172072495275,0.0114060894840005
+cArc part,wMat,-0.00974172072495275,0.0114060894840005,-0.00966084525414451,0.0112326071339339,-0.00955385859386136,0.0110738925417134
+cArc part,wMat,-0.00955385859386136,0.0110738925417134,-0.00926924363941042,0.0106719362102469,-0.00903085108991609,0.0102409558621333
+cArc part,wMat,-0.00903085108991609,0.0102409558621333,-0.00896745635589551,0.0097856738488933,-0.00918158502667402,0.0093789189887724
+cArc part,wMat,-0.00918158502667402,0.0093789189887724,-0.00928077650307341,0.00928077650307347,-0.0093789189887724,0.00918158502667402
+cArc part,wMat,-0.0093789189887724,0.00918158502667402,-0.00978567384889332,0.0089674563558955,-0.0102409558621333,0.00903085108991607
+cArc part,wMat,-0.0102409558621333,0.00903085108991607,-0.0106719362102469,0.00926924363941041,-0.0110738925417134,0.00955385859386136
+cArc part,wMat,-0.0110738925417134,0.00955385859386136,-0.0112326071339339,0.00966084525414452,-0.0114060894840005,0.00974172072495275
+cArc part,wMat,-0.0114060894840005,0.00974172072495275,-0.0121915636721479,0.00996424284267784,-0.013002779213656,0.0100559769058087
+cArc part,wMat,-0.013002779213656,0.0100559769058087,-0.0130719144889627,0.0100414704102772,-0.0131267436718243,0.0099969295573301
+cArc part,wMat,-0.0131267436718243,0.0099969295573301,-0.0133487805062798,0.00969845652643572,-0.0135640318828393,0.00939505396904771
+cArc part,wMat,-0.0135640318828393,0.00939505396904771,-0.0135894495929847,0.00932914444989222,-0.0135818821317881,0.00925891018856749
+cArc part,wMat,-0.0135818821317881,0.00925891018856749,-0.0132439584481741,0.00851574569975717,-0.0127896025177854,0.00783747853670817
+cArc part,wMat,-0.0127896025177854,0.00783747853670817,-0.0126590763273962,0.00769747884615412,-0.0125082804607257,0.00757959299519051
+cArc part,wMat,-0.0125082804607257,0.00757959299519051,-0.0121133842162403,0.00728526066466177,-0.0117534791767988,0.00694904134531932
+cArc part,wMat,-0.0117534791767988,0.00694904134531932,-0.0115524973225853,0.0065356324700417,-0.0116304516259329,0.00608261621153552
+cArc part,wMat,-0.0116304516259329,0.00608261621153552,-0.0116944606299724,0.0059586253090815,-0.0117571478286172,0.00583396091313977
+cArc part,wMat,-0.0117571478286172,0.00583396091313977,-0.0120778252906164,0.00550461828114827,-0.0125304142662265,0.00542422037671295
+cArc part,wMat,-0.0125304142662265,0.00542422037671295,-0.0130139682838212,0.00551776491253703,-0.0134842023299071,0.00566423848218288
+cArc part,wMat,-0.0134842023299071,0.00566423848218288,-0.0136682095732685,0.00571694333635044,-0.0138581930347461,0.00574025148753176
+cArc part,wMat,-0.0138581930347461,0.00574025148753176,-0.0146739864486899,0.00570915772277816,-0.0154738456600316,0.00554572261285793
+cArc part,wMat,-0.0154738456600316,0.00554572261285793,-0.0155351144604699,0.00551056214077351,-0.0155734962316089,0.00545125812304491
+cArc part,wMat,-0.0155734962316089,0.00545125812304491,-0.0156924325709664,0.00509878024685044,-0.0158033922489151,0.00474371093416652
+cArc part,wMat,-0.0158033922489151,0.00474371093416652,-0.015807198766268,0.00467317275209478,-0.0157782981040178,0.00460871447607606
+cArc part,wMat,-0.0157782981040178,0.00460871447607606,-0.0152272631246785,0.00400634720558505,-0.0145855488059651,0.00350168045783859
+cArc part,wMat,-0.0145855488059651,0.00350168045783859,-0.014418148808751,0.00340886769742391,-0.0142383046857797,0.0033433500761687
+cArc part,wMat,-0.0142383046857797,0.0033433500761687,-0.013771782347074,0.00318545304582382,-0.0133255948305517,0.00297690624480748
+cArc part,wMat,-0.0133255948305517,0.00297690624480748,-0.0130066993603587,0.0026458378485934,-0.0129408485859241,0.00219090457943439
+cArc part,wMat,-0.0129408485859241,0.00219090457943439,-0.0129634094703112,0.00205320235365285,-0.0129845051221312,0.00191526805783159
+cArc part,wMat,-0.0129845051221312,0.00191526805783159,-0.013187715041737,0.00150294981611148,-0.0135933084174116,0.00128662918027154
+cArc part,wMat,-0.0135933084174116,0.00128662918027154,-0.0140821024681263,0.00122616891149579,-0.0145745844440875,0.00122016324279824
+cArc part,wMat,-0.0145745844440875,0.00122016324279824,-0.0147658724275557,0.00121342717250791,-0.0149537600059969,0.00117688643591768
+cArc part,wMat,-0.0149537600059969,0.00117688643591768,-0.0157200171919588,0.000895220466932098,-0.0164302242805811,0.000492614351239124
+cArc part,wMat,-0.0164302242805811,0.000492614351239124,-0.0164776291890791,0.00044024165458683,-0.016495806473315,0.000371979562527394
+Part.SketchManager.InsertSketch True
+end sub
+
+sub codeBag6(part,wMat)
+cLn part,wMat,-0.027,0,-0.027,0.006
+cLn part,wMat,-0.027,0.006,0,0.006
+cLn part,wMat,0,0.006,0,0
+cLn part,wMat,0,0,-0.027,0
+cCLn part,wMat,0,0,-0.027,0
+Part.SketchManager.InsertSketch True
+end sub
+
+sub codeBag7(part,wMat)
+cLn part,wMat,-0.0003,0.006,0,0.006
+cLn part,wMat,0,0.006,0,0.0063
+cLn part,wMat,0,0.0063,-0.0003,0.006
+cCLn part,wMat,0.5,0,-0.5,0
+Part.SketchManager.InsertSketch True
+end sub
+
+sub codeBag8(part,wMat)
+cLn part,wMat,-0.027,0.0063,-0.027,0.006
+cLn part,wMat,-0.027,0.006,-0.0267,0.006
+cLn part,wMat,-0.0267,0.006,-0.027,0.0063
+cCLn part,wMat,0.5,0,-0.5,0
+Part.SketchManager.InsertSketch True
+end sub
+
+sub codeBag9(part,wMat)
+cLn part,wMat,0,0,-0.001621,0
+cLn part,wMat,-0.001621,0,-0.001621,0.012121
+cLn part,wMat,-0.001621,0.012121,-0.002,0.0125
+cLn part,wMat,-0.002,0.0125,0,0.0125
+cLn part,wMat,0,0.0125,0,0
+cCLn part,wMat,0,0.0125,0,0
+Part.SketchManager.InsertSketch True
+end sub
+
+sub codeBag0(part,featMgr)
+part.CreatePlaneFixed2 createVec3d(0,0,0),createVec3d(0,0,-1),createVec3d(0,1,0),1
+set feat5=part.Extension.GetLastFeatureAdded()
+feat5.select2 false,0
+part.SketchManager.InsertSketch True
+part.BlankRefGeom
+Set swActiveMat = Part.SketchManager.ActiveSketch
+swSketchMat= createMatFromSWMat(swActiveMat.ModelToSketchXForm)
+mSkMat=createMat4x4FromValues(0,0,-1,0,1,0,1,0,0,0,0,0)
+wMat=mulMat4x4Mat4x4(swSketchMat,mSkMat)
+codeBag1 part,wMat
+set feat5=part.Extension.GetLastFeatureAdded()
+feat5.select2 false,0
+featMgr.FeatureRevolve 6.28318530717959,1,6.28318530717959,0,0,1,1,1
+part.CreatePlaneFixed2 createVec3d(0,0,0),createVec3d(1,0,0),createVec3d(0,1,0),1
+set feat7=part.Extension.GetLastFeatureAdded()
+feat7.select2 false,0
+part.SketchManager.InsertSketch True
+part.BlankRefGeom
+Set swActiveMat = Part.SketchManager.ActiveSketch
+swSketchMat= createMatFromSWMat(swActiveMat.ModelToSketchXForm)
+mSkMat=createMat4x4FromValues(1,0,0,0,1,0,0,0,1,0,0,0)
+wMat=mulMat4x4Mat4x4(swSketchMat,mSkMat)
+codeBag2 part,wMat
+codeBag3 part,wMat
+codeBag4 part,wMat
+codeBag5 part,wMat
+set feat7=part.Extension.GetLastFeatureAdded()
+feat7.select2 false,0
+featMgr.FeatureCut3 1,0,1,0,0,0.016,0.016,1,1,0,0,0,0,0,0,0,0,0,1,1,false,false,false,0,0,0
+part.CreatePlaneFixed2 createVec3d(0,0,0),createVec3d(0,0,-1),createVec3d(0,1,0),1
+set feat9=part.Extension.GetLastFeatureAdded()
+feat9.select2 false,0
+part.SketchManager.InsertSketch True
+part.BlankRefGeom
+Set swActiveMat = Part.SketchManager.ActiveSketch
+swSketchMat= createMatFromSWMat(swActiveMat.ModelToSketchXForm)
+mSkMat=createMat4x4FromValues(0,0,-1,0,1,0,1,0,0,0,0,0)
+wMat=mulMat4x4Mat4x4(swSketchMat,mSkMat)
+codeBag6 part,wMat
+set feat9=part.Extension.GetLastFeatureAdded()
+feat9.select2 false,0
+featMgr.FeatureRevolveCut2 6.28318530717959,1,6.28318530717959,0,0,1,1,false,false,false
+part.CreatePlaneFixed2 createVec3d(0,0,0),createVec3d(0,0,-1),createVec3d(0,1,0),1
+set feat11=part.Extension.GetLastFeatureAdded()
+feat11.select2 false,0
+part.SketchManager.InsertSketch True
+part.BlankRefGeom
+Set swActiveMat = Part.SketchManager.ActiveSketch
+swSketchMat= createMatFromSWMat(swActiveMat.ModelToSketchXForm)
+mSkMat=createMat4x4FromValues(0,0,-1,0,1,0,1,0,0,0,0,0)
+wMat=mulMat4x4Mat4x4(swSketchMat,mSkMat)
+codeBag7 part,wMat
+set feat11=part.Extension.GetLastFeatureAdded()
+feat11.select2 false,0
+featMgr.FeatureRevolveCut2 6.28318530717959,1,6.28318530717959,0,0,1,1,false,false,false
+part.CreatePlaneFixed2 createVec3d(0,0,0),createVec3d(0,0,-1),createVec3d(0,1,0),1
+set feat13=part.Extension.GetLastFeatureAdded()
+feat13.select2 false,0
+part.SketchManager.InsertSketch True
+part.BlankRefGeom
+Set swActiveMat = Part.SketchManager.ActiveSketch
+swSketchMat= createMatFromSWMat(swActiveMat.ModelToSketchXForm)
+mSkMat=createMat4x4FromValues(0,0,-1,0,1,0,1,0,0,0,0,0)
+wMat=mulMat4x4Mat4x4(swSketchMat,mSkMat)
+codeBag8 part,wMat
+set feat13=part.Extension.GetLastFeatureAdded()
+feat13.select2 false,0
+featMgr.FeatureRevolveCut2 6.28318530717959,1,6.28318530717959,0,0,1,1,false,false,false
+part.CreatePlaneFixed2 createVec3d(0,0,0.022),createVec3d(1,0,0.022),createVec3d(0,1,0.022),1
+set feat18=part.Extension.GetLastFeatureAdded()
+feat18.select2 false,0
+part.SketchManager.InsertSketch True
+part.BlankRefGeom
+Set swActiveMat = Part.SketchManager.ActiveSketch
+swSketchMat= createMatFromSWMat(swActiveMat.ModelToSketchXForm)
+mSkMat=createMat4x4FromValues(1,0,0,0,1,0,0,0,1,0,0,0.022)
+wMat=mulMat4x4Mat4x4(swSketchMat,mSkMat)
+codeBag9 part,wMat
+set feat18=part.Extension.GetLastFeatureAdded()
+feat18.select2 false,0
+featMgr.FeatureRevolveCut2 6.28318530717959,1,6.28318530717959,0,0,1,1,false,false,false
+ if getEdgeFromModel(part,createVec3d(0,0.012121,0.020379),cylEdge) then
+   cylEdge.Select(false)
+   Part.InsertCosmeticThread 0,0.004,0.0065,""
+ elseif getEdgeFromModel(part,createVec3d(0,0.006,0.020379),cylEdge) then
+   cylEdge.Select(false)
+   Part.InsertCosmeticThread 0,0.004,0.0065,""
+ End If
+end sub
+
+sub codeBag11(part,wMat)
+cLn part,wMat,-0.006,0,-0.006,0.0015705
+cLn part,wMat,-0.006,0.0015705,-0.0055705,0.002
+cLn part,wMat,-0.0055705,0.002,-0.00075,0.002
+cLn part,wMat,-0.00075,0.002,0,0.00125
+cLn part,wMat,0,0.00125,0,0
+cLn part,wMat,0,0,-0.006,0
+cCLn part,wMat,0,0,-0.006,0
+Part.SketchManager.InsertSketch True
+end sub
+
+sub codeBag12(part,wMat)
+cLn part,wMat,-0.001,-0.000577350269189626,0,-0.00115470053837925
+cLn part,wMat,0,-0.00115470053837925,0.001,-0.000577350269189626
+cLn part,wMat,0.001,-0.000577350269189626,0.001,0.000577350269189626
+cLn part,wMat,0.001,0.000577350269189626,0,0.00115470053837925
+cLn part,wMat,0,0.00115470053837925,-0.001,0.000577350269189626
+cLn part,wMat,-0.001,0.000577350269189626,-0.001,-0.000577350269189626
+Part.SketchManager.InsertSketch True
+end sub
+
+sub codeBag13(part,wMat)
+cLn part,wMat,-0.0045,0,-0.0045,0.001
+cLn part,wMat,-0.0045,0.001,-0.00392264973081037,0
+cLn part,wMat,-0.00392264973081037,0,-0.0045,0
+cCLn part,wMat,-0.00392264973081037,0,-0.0045,0
+Part.SketchManager.InsertSketch True
+end sub
+
+sub codeBag10(part,featMgr)
+part.CreatePlaneFixed2 createVec3d(0,0,0),createVec3d(1,0,0),createVec3d(0,1,0),1
+set feat4=part.Extension.GetLastFeatureAdded()
+feat4.select2 false,0
+part.SketchManager.InsertSketch True
+part.BlankRefGeom
+Set swActiveMat = Part.SketchManager.ActiveSketch
+swSketchMat= createMatFromSWMat(swActiveMat.ModelToSketchXForm)
+mSkMat=createMat4x4FromValues(1,0,0,0,1,0,0,0,1,0,0,0)
+wMat=mulMat4x4Mat4x4(swSketchMat,mSkMat)
+codeBag11 part,wMat
+set feat4=part.Extension.GetLastFeatureAdded()
+feat4.select2 false,0
+featMgr.FeatureRevolve 6.28318530717959,1,6.28318530717959,0,0,1,1,1
+ if getEdgeFromModel(part,createVec3d(-0.0055705,0.002,0),cylEdge) then
+   cylEdge.Select(false)
+   Part.InsertCosmeticThread 0,0.003141,0.006,""
+ elseif getEdgeFromModel(part,createVec3d(-0.00075,0.002,0),cylEdge) then
+   cylEdge.Select(false)
+   Part.InsertCosmeticThread 0,0.003141,0.006,""
+ End If
+part.CreatePlaneFixed2 createVec3d(-0.006,0,0),createVec3d(-0.006,1,0),createVec3d(-0.006,0,-1),1
+set feat6=part.Extension.GetLastFeatureAdded()
+feat6.select2 false,0
+part.SketchManager.InsertSketch True
+part.BlankRefGeom
+Set swActiveMat = Part.SketchManager.ActiveSketch
+swSketchMat= createMatFromSWMat(swActiveMat.ModelToSketchXForm)
+mSkMat=createMat4x4FromValues(0,1,0,0,0,-1,-1,0,0,-0.006,0,0)
+wMat=mulMat4x4Mat4x4(swSketchMat,mSkMat)
+codeBag12 part,wMat
+set feat6=part.Extension.GetLastFeatureAdded()
+feat6.select2 false,0
+featMgr.FeatureCut3 1,0,0,0,0,0.0015,0.0015,1,1,0,0,0,0,0,0,0,0,0,1,1,false,false,false,0,0,0
+part.CreatePlaneFixed2 createVec3d(0,0,0),createVec3d(1,0,0),createVec3d(0,1,0),1
+set feat8=part.Extension.GetLastFeatureAdded()
+feat8.select2 false,0
+part.SketchManager.InsertSketch True
+part.BlankRefGeom
+Set swActiveMat = Part.SketchManager.ActiveSketch
+swSketchMat= createMatFromSWMat(swActiveMat.ModelToSketchXForm)
+mSkMat=createMat4x4FromValues(1,0,0,0,1,0,0,0,1,0,0,0)
+wMat=mulMat4x4Mat4x4(swSketchMat,mSkMat)
+codeBag13 part,wMat
+set feat8=part.Extension.GetLastFeatureAdded()
+feat8.select2 false,0
+featMgr.FeatureRevolveCut2 6.28318530717959,1,6.28318530717959,0,0,1,1,false,false,false
+end sub
+
+sub codeBag14()
+createPart0
+createPart1
+end sub
+
+sub codeBag15(part)
+set res=swApp.OpenDoc6 ( storePath & "GEAB1_5-20-15-B-12_b.sldprt",1,3,"", errorsDoc, warningsDoc)
+set comp = part.AddComponent5 (storePath &"GEAB1_5-20-15-B-12_b.sldprt", 0, "", false, "",0,0,0)
+comp.SetXForm(createSWMatFromMat(createMat4x4FromValues(1,0,0,0,1,0,0,0,1,0,0,0)))
+set res=swApp.OpenDoc6 ( storePath & "SET-SCREW4-6.sldprt",1,3,"", errorsDoc, warningsDoc)
+set comp = part.AddComponent5 (storePath &"SET-SCREW4-6.sldprt", 0, "", false, "",0,0,0)
+comp.SetXForm(createSWMatFromMat(createMat4x4FromValues(0,-1,0,0,0,1,-1,0,0,0,0.006,0.022)))
+end sub
+
+sub codeBag16()
+end sub
+
+sub main
+set swApp = Application.SldWorks
+code = swApp.RevisionNumber
+found = InStr(code, ".")
+If (found > 0) Then
+  code = Left(code, found-1)
+  docVisible=1
+  If (CInt(code) >= 18) Then
+    docVisible=0
+  End If
+End If
+swApp.SetUserPreferenceToggle 11, FALSE
+swApp.SetUserPreferenceToggle 97, FALSE
+storePath=BrowseForFolder
+If (storePath <> "") Then
+   If ((Right(storePath, 1) <> "\") And (Right(storePath, 1) <> "/")) Then
+       storePath = storePath + "\"
+   End If
+   createPart2
+End If
+end sub
